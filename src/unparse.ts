@@ -1,6 +1,6 @@
 
 import * as randexp from 'randexp';
-import { Grammar } from './nearley';
+import { Grammar } from './grammar';
 
 function genRandom(grammar, start) {
     // The first-generation generator. It just spews out stuff randomly, and is

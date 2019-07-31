@@ -1,5 +1,9 @@
-import { Grammar, Parser, Rule } from './nearley';
-export class Compile {
+import { Grammar } from "./grammar";
+import { Parser } from "./parser";
+import { Rule } from "./rule";
+
+export const Compile = (structure, opts) => new Compiler(structure, opts);
+export class Compiler {
     private unique = uniquer();
     public rules: any = [];
     public body: any = [];
@@ -8,7 +12,6 @@ export class Compile {
     public macros: any = {};
     public start: any = '';
     public version;// opts.version || 'unknown'
-
 
     constructor(structure, private opts) {
         if (!opts.alreadycompiled) {
@@ -41,14 +44,14 @@ export class Compile {
                     var parserGrammar = Grammar.fromCompiled(require('./nearley-language-bootstrapped.js'));
                     var parser = new Parser(parserGrammar);
                     parser.feed(f);
-                    var c = new Compile(parser.results[0], { args: [path], __proto__: opts });
+                    var c = new Compiler(parser.results[0], { args: [path], __proto__: opts });
                     this.rules = this.rules.concat(c.rules);
                     this.body = this.body.concat(c.body);
                     this.customTokens = this.customTokens.concat(c.customTokens);
-                    Object.keys(c.config).forEach(function (k) {
+                    Object.keys(c.config).forEach((k) => {
                         this.config[k] = c.config[k];
                     });
-                    Object.keys(c.macros).forEach(function (k) {
+                    Object.keys(c.macros).forEach((k) => {
                         this.macros[k] = c.macros[k];
                     });
                 }
@@ -68,6 +71,7 @@ export class Compile {
             }
         }
     }
+
     private produceRules(name, rules, env) {
         for (var i = 0; i < rules.length; i++) {
             var rule = this.buildRule(name, rules[i], env);
@@ -77,7 +81,6 @@ export class Compile {
             this.rules.push(rule);
         }
     }
-
 
     private buildRule(ruleName, rule, env) {
         var tokens = [];
@@ -89,7 +92,6 @@ export class Compile {
         }
         return new Rule(ruleName, tokens, rule.postprocess);
     }
-
 
     private buildToken(ruleName, token, env) {
         if (typeof token === 'string') {
@@ -151,7 +153,7 @@ export class Compile {
         var newname = this.unique(ruleName + "$string");
         this.produceRules(newname, [
             {
-                tokens: token.literal.split("").map(function charLiteral(d) {
+                tokens: token.literal.split("").map((d) => {
                     return {
                         literal: d
                     };
