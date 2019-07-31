@@ -1,49 +1,42 @@
-(function(root, factory) {
-    if (typeof module === 'object' && module.exports) {
-        module.exports = factory();
-    } else {
-        root.nearley = factory();
-    }
-}(this, function() {
 
-    function Rule(name, symbols, postprocess) {
+
+export class Rule {
+    static highestId = 0;
+    private id: number;
+    constructor(private name, private symbols, public postprocess) {
         this.id = ++Rule.highestId;
-        this.name = name;
-        this.symbols = symbols;        // a list of literal | regex class | nonterminal
-        this.postprocess = postprocess;
-        return this;
     }
-    Rule.highestId = 0;
 
-    Rule.prototype.toString = function(withCursorAt) {
-        function stringifySymbolSequence (e) {
+
+    toString(withCursorAt) {
+        function stringifySymbolSequence(e) {
             return e.literal ? JSON.stringify(e.literal) :
-                   e.type ? '%' + e.type : e.toString();
+                e.type ? '%' + e.type : e.toString();
         }
         var symbolSequence = (typeof withCursorAt === "undefined")
-                             ? this.symbols.map(stringifySymbolSequence).join(' ')
-                             : (   this.symbols.slice(0, withCursorAt).map(stringifySymbolSequence).join(' ')
-                                 + " ● "
-                                 + this.symbols.slice(withCursorAt).map(stringifySymbolSequence).join(' ')     );
+            ? this.symbols.map(stringifySymbolSequence).join(' ')
+            : (this.symbols.slice(0, withCursorAt).map(stringifySymbolSequence).join(' ')
+                + " ● "
+                + this.symbols.slice(withCursorAt).map(stringifySymbolSequence).join(' '));
         return this.name + " → " + symbolSequence;
     }
+}
 
+export class State {
+    data = [];
+    isComplete: boolean;
+    public left: State;
+    public right: State;
 
-    // a State is a rule at a position from a given starting point in the input stream (reference)
-    function State(rule, dot, reference, wantedBy) {
-        this.rule = rule;
-        this.dot = dot;
-        this.reference = reference;
-        this.data = [];
-        this.wantedBy = wantedBy;
+    constructor(private rule, private dot, private reference, private wantedBy) {
         this.isComplete = this.dot === rule.symbols.length;
     }
 
-    State.prototype.toString = function() {
+    toString() {
         return "{" + this.rule.toString(this.dot) + "}, from: " + (this.reference || 0);
     };
 
-    State.prototype.nextState = function(child) {
+    nextState(child) {
         var state = new State(this.rule, this.dot + 1, this.reference, this.wantedBy);
         state.left = this;
         state.right = child;
@@ -53,9 +46,9 @@
         return state;
     };
 
-    State.prototype.build = function() {
-        var children = [];
-        var node = this;
+    build() {
+        let children = [];
+        let node: State = this;
         do {
             children.push(node.right.data);
             node = node.left;
@@ -64,24 +57,24 @@
         return children;
     };
 
-    State.prototype.finish = function() {
+    finish() {
         if (this.rule.postprocess) {
             this.data = this.rule.postprocess(this.data, this.reference, Parser.fail);
         }
-    };
-
-
-    function Column(grammar, index) {
-        this.grammar = grammar;
-        this.index = index;
-        this.states = [];
-        this.wants = {}; // states indexed by the non-terminal they expect
-        this.scannable = []; // list of states that expect a token
-        this.completed = {}; // states that are nullable
     }
+}
+
+export class Column {
+
+    states = [];
+    wants = {};
+    scannable = [];
+    completed = {};
+
+    constructor(private grammar, private index) { }
 
 
-    Column.prototype.process = function(nextColumn) {
+    process(nextColumn?) {
         var states = this.states;
         var wants = this.wants;
         var completed = this.completed;
@@ -94,7 +87,7 @@
                 if (state.data !== Parser.fail) {
                     // complete
                     var wantedBy = state.wantedBy;
-                    for (var i = wantedBy.length; i--; ) { // this line is hot
+                    for (var i = wantedBy.length; i--;) { // this line is hot
                         var left = wantedBy[i];
                         this.complete(left, state);
                     }
@@ -121,7 +114,7 @@
 
                     if (completed.hasOwnProperty(exp)) {
                         var nulls = completed[exp];
-                        for (var i = 0; i < nulls.length; i++) {
+                        for (let i = 0; i < nulls.length; i++) {
                             var right = nulls[i];
                             this.complete(state, right);
                         }
@@ -134,7 +127,7 @@
         }
     }
 
-    Column.prototype.predict = function(exp) {
+    predict(exp) {
         var rules = this.grammar.byName[exp] || [];
 
         for (var i = 0; i < rules.length; i++) {
@@ -145,17 +138,20 @@
         }
     }
 
-    Column.prototype.complete = function(left, right) {
+    complete(left, right) {
         var copy = left.nextState(right);
         this.states.push(copy);
     }
 
+}
 
-    function Grammar(rules, start) {
-        this.rules = rules;
-        this.start = start || this.rules[0].name;
+export class Grammar {
+    byName = {};
+    lexer;
+    constructor(private rules, public start) {
+        this.start = this.start || this.rules[0].name;
         var byName = this.byName = {};
-        this.rules.forEach(function(rule) {
+        this.rules.forEach(function (rule) {
             if (!byName.hasOwnProperty(rule.name)) {
                 byName[rule.name] = [];
             }
@@ -164,49 +160,55 @@
     }
 
     // So we can allow passing (rules, start) directly to Parser for backwards compatibility
-    Grammar.fromCompiled = function(rules, start) {
+    static fromCompiled(rules, start?) {
         var lexer = rules.Lexer;
         if (rules.ParserStart) {
-          start = rules.ParserStart;
-          rules = rules.ParserRules;
+            start = rules.ParserStart;
+            rules = rules.ParserRules;
         }
         var rules = rules.map(function (r) { return (new Rule(r.name, r.symbols, r.postprocess)); });
         var g = new Grammar(rules, start);
         g.lexer = lexer; // nb. storing lexer on Grammar is iffy, but unavoidable
         return g;
     }
+}
 
+export class StreamLexer {
+    buffer;
+    index;
+    line;
+    lastLineBreak;
 
-    function StreamLexer() {
-      this.reset("");
+    constructor() {
+        this.reset("");
     }
 
-    StreamLexer.prototype.reset = function(data, state) {
+    reset(data, state?) {
         this.buffer = data;
         this.index = 0;
         this.line = state ? state.line : 1;
         this.lastLineBreak = state ? -state.col : 0;
     }
 
-    StreamLexer.prototype.next = function() {
+    next() {
         if (this.index < this.buffer.length) {
             var ch = this.buffer[this.index++];
             if (ch === '\n') {
-              this.line += 1;
-              this.lastLineBreak = this.index;
+                this.line += 1;
+                this.lastLineBreak = this.index;
             }
-            return {value: ch};
+            return { value: ch };
         }
     }
 
-    StreamLexer.prototype.save = function() {
-      return {
-        line: this.line,
-        col: this.index - this.lastLineBreak,
-      }
+    save() {
+        return {
+            line: this.line,
+            col: this.index - this.lastLineBreak,
+        }
     }
 
-    StreamLexer.prototype.formatError = function(token, message) {
+    formatError(token, message) {
         // nb. this gets called after consuming the offending token,
         // so the culprit is index-1
         var buffer = this.buffer;
@@ -223,9 +225,18 @@
             return message + " at index " + (this.index - 1);
         }
     }
+}
 
+export class Parser {
+    static fail = {};
+    grammar;
+    lexer;
+    lexerState;
+    table;
+    current;
+    results;
 
-    function Parser(rules, start, options) {
+    constructor(private rules, private start?, private options?) {
         if (rules instanceof Grammar) {
             var grammar = rules;
             var options = start;
@@ -249,7 +260,7 @@
 
         // Setup a table
         var column = new Column(grammar, 0);
-        var table = this.table = [column];
+        this.table = [column];
 
         // I could be expecting anything.
         column.wants[grammar.start] = [];
@@ -259,10 +270,7 @@
         this.current = 0; // token index
     }
 
-    // create a reserved token for indicating a parse fail
-    Parser.fail = {};
-
-    Parser.prototype.feed = function(chunk) {
+    feed(chunk) {
         var lexer = this.lexer;
         lexer.reset(chunk, this.lexerState);
 
@@ -284,16 +292,16 @@
             var literal = token.text !== undefined ? token.text : token.value;
             var value = lexer.constructor === StreamLexer ? token.value : token;
             var scannable = column.scannable;
-            for (var w = scannable.length; w--; ) {
+            for (var w = scannable.length; w--;) {
                 var state = scannable[w];
                 var expect = state.rule.symbols[state.dot];
                 // Try to consume the token
                 // either regex or literal
                 if (expect.test ? expect.test(value) :
                     expect.type ? expect.type === token.type
-                                : expect.literal === literal) {
+                        : expect.literal === literal) {
                     // Add it
-                    var next = state.nextState({data: value, token: token, isToken: true, reference: n - 1});
+                    var next = state.nextState({ data: value, token: token, isToken: true, reference: n - 1 });
                     nextColumn.states.push(next);
                 }
             }
@@ -311,7 +319,7 @@
             // If needed, throw an error:
             if (nextColumn.states.length === 0) {
                 // No states at all! This is not good.
-                var err = new Error(this.reportError(token));
+                var err: TokenError = new Error(this.reportError(token));
                 err.offset = this.current;
                 err.token = token;
                 throw err;
@@ -319,13 +327,13 @@
 
             // maybe save lexer state
             if (this.options.keepHistory) {
-              column.lexerState = lexer.save()
+                column.lexerState = lexer.save()
             }
 
             this.current++;
         }
         if (column) {
-          this.lexerState = lexer.save()
+            this.lexerState = lexer.save()
         }
 
         // Incrementally keep track of results
@@ -335,7 +343,7 @@
         return this;
     };
 
-    Parser.prototype.reportError = function(token) {
+    reportError(token) {
         var lines = [];
         const tokenDisplay = (token.type ? token.type + " token: " : "") + JSON.stringify(token.value !== undefined ? token.value : token);
         lines.push(this.lexer.formatError(token, "Syntax error"));
@@ -343,33 +351,33 @@
         const lastColumnIndex = this.table.length - 2;
         const lastColumn = this.table[lastColumnIndex];
         const expectantStates = lastColumn.states
-            .filter(function(state) {
+            .filter(function (state) {
                 const nextSymbol = state.rule.symbols[state.dot];
                 return nextSymbol && typeof nextSymbol !== "string";
             });
-        
+
         // Display a "state stack" for each expectant state
         // - which shows you how this state came to be, step by step. 
         // If there is more than one derivation, we only display the first one.
         const stateStacks = expectantStates
-            .map(function(state) {
+            .map(function (state) {
                 const stacks = this.buildStateStacks(state, []);
                 return stacks[0];
             }, this);
         // Display each state that is expecting a terminal symbol next.
-        stateStacks.forEach(function(stateStack) {
+        stateStacks.forEach(function (stateStack) {
             const state = stateStack[0];
             const nextSymbol = state.rule.symbols[state.dot];
             const symbolDisplay = this.getSymbolDisplay(nextSymbol);
             lines.push('A ' + symbolDisplay + ' based on:');
             this.displayStateStack(stateStack, lines);
         }, this);
-            
+
         lines.push("");
         return lines.join("\n");
     };
 
-    Parser.prototype.displayStateStack = function(stateStack, lines) {
+    displayStateStack(stateStack, lines) {
         var lastDisplay;
         var sameDisplayCount = 0;
         for (let j = 0; j < stateStack.length; j++) {
@@ -388,7 +396,7 @@
         }
     };
 
-    Parser.prototype.getSymbolDisplay = function(symbol) {
+    getSymbolDisplay(symbol) {
         const type = typeof symbol;
         if (type === "string") {
             return symbol;
@@ -409,12 +417,12 @@
     A state stack is represented as an array of state objects. Within a 
     state stack, the first item of the array will be the starting
     state, with each successive item in the array going further back into history.
-    
+     
     This function needs to be given a starting state and an empty array representing
     the visited states, and it returns an array of state stacks. 
-    
+     
     */
-    Parser.prototype.buildStateStacks = function(state, visited) {
+    buildStateStacks(state, visited) {
         if (visited.indexOf(state) !== -1) {
             // Found cycle, return empty array (meaning no stacks)
             // to eliminate this path from the results, because
@@ -426,23 +434,23 @@
         }
         var that = this;
 
-        return state.wantedBy.reduce(function(stacks, prevState) {
+        return state.wantedBy.reduce(function (stacks, prevState) {
             return stacks.concat(that.buildStateStacks(
                 prevState,
                 [state].concat(visited))
-                .map(function(stack) {
+                .map(function (stack) {
                     return [state].concat(stack);
                 }));
         }, []);
     };
 
-    Parser.prototype.save = function() {
+    save() {
         var column = this.table[this.current];
         column.lexerState = this.lexerState;
         return column;
     };
 
-    Parser.prototype.restore = function(column) {
+    restore(column) {
         var index = column.index;
         this.current = index;
         this.table[index] = column;
@@ -454,7 +462,7 @@
     };
 
     // nb. deprecated: use save/restore instead!
-    Parser.prototype.rewind = function(index) {
+    rewind(index) {
         if (!this.options.keepHistory) {
             throw new Error('set option `keepHistory` to enable rewinding')
         }
@@ -463,26 +471,25 @@
         this.restore(this.table[index]);
     };
 
-    Parser.prototype.finish = function() {
+    finish() {
         // Return the possible parsings
         var considerations = [];
         var start = this.grammar.start;
         var column = this.table[this.table.length - 1]
         column.states.forEach(function (t) {
             if (t.rule.name === start
-                    && t.dot === t.rule.symbols.length
-                    && t.reference === 0
-                    && t.data !== Parser.fail) {
+                && t.dot === t.rule.symbols.length
+                && t.reference === 0
+                && t.data !== Parser.fail) {
                 considerations.push(t);
             }
         });
-        return considerations.map(function(c) {return c.data; });
+        return considerations.map(function (c) { return c.data; });
     };
 
-    return {
-        Parser: Parser,
-        Grammar: Grammar,
-        Rule: Rule,
-    };
+}
 
-}));
+interface TokenError extends Error {
+    offset?;
+    token?;
+}
