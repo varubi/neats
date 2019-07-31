@@ -1,39 +1,38 @@
-import { PreProcessor, Generate } from "../generate";
+import { PreProcessor, serializeRules } from "../generate";
 
 export const TypeScriptProcessor: PreProcessor = {
-    Preprocess(parser, exportName) {
-        var output = "// Generated automatically by nearley, version " + parser.version + "\n";
-        output += "// http://github.com/Hardmath123/nearley\n";
-        output += "// Bypasses TS6133. Allow declared but unused functions.\n";
-        output += "// @ts-ignore\n";
-        output += "function id(d: any[]): any { return d[0]; }\n";
-        output += parser.customTokens.map(function (token) { return "declare var " + token + ": any;\n" }).join("")
-        output += parser.body.join('\n');
-        output += "\n";
-        output += "export interface Token { value: any; [key: string]: any };\n";
-        output += "\n";
-        output += "export interface Lexer {\n";
-        output += "  reset: (chunk: string, info: any) => void;\n";
-        output += "  next: () => Token | undefined;\n";
-        output += "  save: () => any;\n";
-        output += "  formatError: (token: Token) => string;\n";
-        output += "  has: (tokenType: string) => boolean\n";
-        output += "};\n"
-        output += "\n";
-        output += "export interface NearleyRule {\n";
-        output += "  name: string;\n";
-        output += "  symbols: NearleySymbol[];\n";
-        output += "  postprocess?: (d: any[], loc?: number, reject?: {}) => any\n";
-        output += "};\n";
-        output += "\n";
-        output += "export type NearleySymbol = string | { literal: any } | { test: (token: any) => boolean };\n";
-        output += "\n";
-        output += "export var Lexer: Lexer | undefined = " + parser.config.lexer + ";\n";
-        output += "\n";
-        output += "export var ParserRules: NearleyRule[] = " + Generate.serializeRules(parser.rules, TypeScriptProcessor.builtinPostprocessors) + ";\n";
-        output += "\n";
-        output += "export var ParserStart: string = " + JSON.stringify(parser.start) + ";\n";
-        return output;
+    preProcess(parser, _exportName) {
+        return `// Generated automatically by nearley, version ${parser.version}\n`
+            + `// http://github.com/Hardmath123/nearley\n`
+            + `// Bypasses TS6133. Allow declared but unused functions.\n`
+            + `// @ts-ignore\n`
+            + `function id(d: any[]): any { return d[0]; }\n`
+            + parser.customTokens.map((token) => `declare var ${token}: any;\n`).join(``)
+            + parser.body.join('\n')
+            + `\n`
+            + `export interface Token { value: any; [key: string]: any };\n`
+            + `\n`
+            + `export interface Lexer {\n`
+            + `  reset: (chunk: string, info: any) => void;\n`
+            + `  next: () => Token | undefined;\n`
+            + `  save: () => any;\n`
+            + `  formatError: (token: Token) => string;\n`
+            + `  has: (tokenType: string) => boolean\n`
+            + `};\n`
+            + `\n`
+            + `export interface NearleyRule {\n`
+            + `  name: string;\n`
+            + `  symbols: NearleySymbol[];\n`
+            + `  postprocess?: (d: any[], loc?: number, reject?: {}) => any\n`
+            + `};\n`
+            + `\n`
+            + `export type NearleySymbol = string | { literal: any } | { test: (token: any) => boolean };\n`
+            + `\n`
+            + `export var Lexer: Lexer | undefined = ${parser.config.lexer};\n`
+            + `\n`
+            + `export var ParserRules: NearleyRule[] = ${serializeRules(parser.rules, TypeScriptProcessor.builtinPostprocessors)};\n`
+            + `\n`
+            + `export var ParserStart: string = ${JSON.stringify(parser.start)};\n`;
     },
     builtinPostprocessors: {
         "joiner": "(d) => d.join('')",

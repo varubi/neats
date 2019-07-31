@@ -1,28 +1,26 @@
-import { PreProcessor, Generate } from "../generate";
+import { PreProcessor, tabulateString, deIndent, serializeRules, } from "../generate";
 
 export const CoffeeScriptProcessor: PreProcessor = {
-    Preprocess(parser, exportName) {
-        var output = "# Generated automatically by nearley, version " + parser.version + "\n";
-        output += "# http://github.com/Hardmath123/nearley\n";
-        output += "do ->\n";
-        output += "  id = (d) -> d[0]\n";
-        output += Generate.tabulateString(Generate.dedentFunc(parser.body.join('\n')), '  ') + '\n';
-        output += "  grammar = {\n";
-        output += "    Lexer: " + parser.config.lexer + ",\n";
-        output += "    ParserRules: " +
-            Generate.tabulateString(
-                Generate.serializeRules(parser.rules, CoffeeScriptProcessor),
+    preProcess(parser, exportName) {
+        const rules =
+            tabulateString(
+                serializeRules(parser.rules, CoffeeScriptProcessor),
                 '      ',
-                { indentFirst: false })
-            + ",\n";
-        output += "    ParserStart: " + JSON.stringify(parser.start) + "\n";
-        output += "  }\n";
-        output += "  if typeof module != 'undefined' "
-            + "&& typeof module.exports != 'undefined'\n";
-        output += "    module.exports = grammar;\n";
-        output += "  else\n";
-        output += "    window." + exportName + " = grammar;\n";
-        return output;
+                { indentFirst: false });
+        return `# Generated automatically by nearley, version ${parser.version}\n`
+            + `# http://github.com/Hardmath123/nearley\n`
+            + `do ->\n`
+            + `  id = (d) -> d[0]\n`
+            + `${tabulateString(deIndent(parser.body.join('\n')), '  ')}\n`
+            + `  grammar = {\n`
+            + `    Lexer: ${parser.config.lexer},\n`
+            + `    ParserRules: ${rules},\n`
+            + `    ParserStart: ${JSON.stringify(parser.start)}\n`
+            + `  }\n`
+            + `  if typeof module != 'undefined' && typeof module.exports != 'undefined'\n`
+            + `    module.exports = grammar;\n`
+            + `  else\n`
+            + `    window.${exportName} = grammar;\n`;
     },
     builtinPostprocessors: {
         "joiner": "(d) -> d.join('')",
