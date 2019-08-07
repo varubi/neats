@@ -1,33 +1,4 @@
-import { JavaScriptProcessor } from "./Processors/javascript-processor";
-import { ESModule } from "./Processors/esmodule-processor";
-import { CoffeeScriptProcessor } from "./Processors/coffeescript-processor";
-import { TypeScriptProcessor } from "./Processors/typescript-processor";
 
-
-export function Generate(parser, exportName: string) {
-    const preprocessors: { [key: string]: PreProcessor } = {
-        '_default': JavaScriptProcessor,
-        'js': JavaScriptProcessor,
-        'javascript': JavaScriptProcessor,
-        'module': ESModule,
-        'esmodule': ESModule,
-        'cs': CoffeeScriptProcessor,
-        'coffeescript': CoffeeScriptProcessor,
-        'coffee': CoffeeScriptProcessor,
-        'ts': TypeScriptProcessor,
-        'typescript': TypeScriptProcessor
-    }
-
-    if (!parser.config.preprocessor) {
-        parser.config.preprocessor = "_default";
-    }
-
-    if (!preprocessors[parser.config.preprocessor]) {
-        throw new Error("No such preprocessor: " + parser.config.preprocessor)
-    }
-
-    return preprocessors[parser.config.preprocessor].preProcess(parser, exportName);
-}
 
 export function serializeRules(rules, builtinPostprocessors) {
     return "[\n    "
@@ -44,12 +15,12 @@ export function deIndent(func) {
         return [lines[0].replace(/^\s+|\s+$/g, '')];
     }
 
-    var indent = null;
+    var indent: any;
     var tail = lines.slice(1);
     for (var i = 0; i < tail.length; i++) {
         var match = /^\s*/.exec(tail[i]);
         if (match && match[0].length !== tail[i].length) {
-            if (indent === null ||
+            if (!indent ||
                 match[0].length < indent.length) {
                 indent = match[0];
             }
@@ -105,22 +76,15 @@ function serializeSymbol(s) {
 }
 
 function serializeRule(rule, builtinPostprocessors) {
-    var ret = '{';
-    ret += '"name": ' + JSON.stringify(rule.name);
-    ret += ', "symbols": [' + rule.symbols.map(serializeSymbol).join(', ') + ']';
+    const name = JSON.stringify(rule.name);
+    const symbols = rule.symbols.map(serializeSymbol).join(', ');
+    let postprocess = '';
     if (rule.postprocess) {
         if (rule.postprocess.builtin) {
             rule.postprocess = builtinPostprocessors[rule.postprocess.builtin];
         }
-        ret += ', "postprocess": ' + tabulateString(deIndent(rule.postprocess), '        ', { indentFirst: false });
+        postprocess = ', "postprocess": ' + tabulateString(deIndent(rule.postprocess), '        ', { indentFirst: false });
     }
-    ret += '}';
-    return ret;
-}
+    return `{"name":${name},"symbols":[${symbols}]${postprocess}}`;
 
-export interface PreProcessor {
-    preProcess(parser, exportName): string;
-    builtinPostprocessors?: {
-        [key: string]: string;
-    }
 }

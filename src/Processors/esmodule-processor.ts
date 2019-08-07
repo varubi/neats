@@ -1,16 +1,17 @@
-import { PreProcessor, serializeRules } from '../generate';
+import { PreProcessor } from "./preprocessors";
 import { JavaScriptProcessor } from './javascript-processor';
+import { serializeRules } from '../common/util';
 
 
 export const ESModule: PreProcessor = {
-    preProcess(parser, _exportName) {
-        return `// Generated automatically by nearley, version ` + parser.version + `\n`
+    preProcess(compiler, _exportName) {
+        return `// Generated automatically by nearley, version ` + compiler.version + `\n`
             + `// http://github.com/Hardmath123/nearley\n`
             + `function id(x) { return x[0]; }\n`
-            + parser.body.join('\n')
-            + `let Lexer = ${parser.config.lexer}\n`
-            + `let ParserRules = ${serializeRules(parser.rules, JavaScriptProcessor.builtinPostprocessors)}\n`
-            + `let ParserStart = ${JSON.stringify(parser.start)}\n`
+            + compiler.body.join('\n')
+            + `let Lexer = ${compiler.config.lexer}\n`
+            + `let ParserRules = ${serializeRules(compiler.rules, JavaScriptProcessor.builtinPostprocessors)}\n`
+            + `let ParserStart = ${JSON.stringify(compiler.start)}\n`
             + `export default { Lexer, ParserRules, ParserStart };\n`;
     }
 }

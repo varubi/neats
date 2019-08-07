@@ -1,16 +1,17 @@
-import { PreProcessor, serializeRules } from "../generate";
+import { PreProcessor } from "./preprocessors";
+import { serializeRules } from "../common/util";
 
 export const JavaScriptProcessor: PreProcessor = {
-    preProcess(parser, exportName) {
-        return `// Generated automatically by nearley, version ${parser.version}\n`
+    preProcess(compiler, exportName) {
+        return `// Generated automatically by nearley, version ${compiler.version}\n`
             + `// http://github.com/Hardmath123/nearley\n`
             + `(function () {\n`
             + `function id(x) { return x[0]; }\n`
-            + parser.body.join('\n')
+            + compiler.body.join('\n')
             + `var grammar = {\n`
-            + `    Lexer: ${parser.config.lexer},\n`
-            + `    ParserRules: ${serializeRules(parser.rules, this.builtinPostprocessors)}\n`
-            + `  , ParserStart: ${JSON.stringify(parser.start)}\n`
+            + `    Lexer: ${compiler.config.lexer},\n`
+            + `    ParserRules: ${serializeRules(compiler.rules, this.builtinPostprocessors)}\n`
+            + `  , ParserStart: ${JSON.stringify(compiler.start)}\n`
             + `}\n`
             + `if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {\n`
             + `   module.exports = grammar;\n`

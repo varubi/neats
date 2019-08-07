@@ -1,29 +1,33 @@
 import { Rule } from "./rule";
+import { Dictionary, ParserRule, CompiledRules, Lexer } from "./common/types";
 
 export class Grammar {
-    byName = {};
-    lexer;
-    constructor(private rules, public start) {
-        this.start = this.start || this.rules[0].name;
-        var byName = this.byName = {};
-        this.rules.forEach(function (rule) {
-            if (!byName.hasOwnProperty(rule.name)) {
-                byName[rule.name] = [];
-            }
-            byName[rule.name].push(rule);
+    byName: Dictionary<Rule[]> = {};
+    start: string;
+    lexer?: Lexer;
+    constructor(private rules: Rule[], start?: string) {
+        this.start = start || this.rules[0].name;
+        this.rules.forEach((rule) => {
+            this.byName[rule.name] = this.byName[rule.name] || [];
+            this.byName[rule.name].push(rule);
         });
     }
 
     // So we can allow passing (rules, start) directly to Parser for backwards compatibility
-    static fromCompiled(rules, start?) {
-        var lexer = rules.Lexer;
-        if (rules.ParserStart) {
+    static fromCompiled(rules: CompiledRules | ParserRule[], start?: string): Grammar {
+        let r: ParserRule[];
+        if (!Array.isArray(rules)) {
+            r = rules.ParserRules;
             start = rules.ParserStart;
-            rules = rules.ParserRules;
+        } else {
+            r = rules;
         }
-        var rules = rules.map(function (r) { return (new Rule(r.name, r.symbols, r.postprocess)); });
-        var g = new Grammar(rules, start);
-        g.lexer = lexer; // nb. storing lexer on Grammar is iffy, but unavoidable
+        const rs = r.map(r => new Rule(r.name, r.symbols, r.postprocess));
+        var g = new Grammar(rs, start);
+        if ('Lexer' in rules) {
+            g.lexer = rules.Lexer;
+        }
         return g;
     }
 }
+

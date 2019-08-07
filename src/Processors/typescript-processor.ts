@@ -1,14 +1,15 @@
-import { PreProcessor, serializeRules } from "../generate";
+import { PreProcessor } from "./preprocessors";
+import { serializeRules } from "../common/util";
 
 export const TypeScriptProcessor: PreProcessor = {
-    preProcess(parser, _exportName) {
-        return `// Generated automatically by nearley, version ${parser.version}\n`
+    preProcess(compiler, _exportName) {
+        return `// Generated automatically by nearley, version ${compiler.version}\n`
             + `// http://github.com/Hardmath123/nearley\n`
             + `// Bypasses TS6133. Allow declared but unused functions.\n`
             + `// @ts-ignore\n`
             + `function id(d: any[]): any { return d[0]; }\n`
-            + parser.customTokens.map((token) => `declare var ${token}: any;\n`).join(``)
-            + parser.body.join('\n')
+            + compiler.customTokens.map((token) => `declare var ${token}: any;\n`).join(``)
+            + compiler.body.join('\n')
             + `\n`
             + `export interface Token { value: any; [key: string]: any };\n`
             + `\n`
@@ -28,11 +29,11 @@ export const TypeScriptProcessor: PreProcessor = {
             + `\n`
             + `export type NearleySymbol = string | { literal: any } | { test: (token: any) => boolean };\n`
             + `\n`
-            + `export var Lexer: Lexer | undefined = ${parser.config.lexer};\n`
+            + `export var Lexer: Lexer | undefined = ${compiler.config.lexer};\n`
             + `\n`
-            + `export var ParserRules: NearleyRule[] = ${serializeRules(parser.rules, TypeScriptProcessor.builtinPostprocessors)};\n`
+            + `export var ParserRules: NearleyRule[] = ${serializeRules(compiler.rules, TypeScriptProcessor.builtinPostprocessors)};\n`
             + `\n`
-            + `export var ParserStart: string = ${JSON.stringify(parser.start)};\n`;
+            + `export var ParserStart: string = ${JSON.stringify(compiler.start)};\n`;
     },
     builtinPostprocessors: {
         "joiner": "(d) => d.join('')",

@@ -1,132 +1,106 @@
 import { Column } from "./column";
 import { Grammar } from "./grammar";
 import { StreamLexer } from "./streamlexer";
+import { Lexer, LexerState, CompiledRules, ParserRule, Token, TokenValue } from "./common/types";
+import { State, StateData } from "./state";
 
 export class Parser {
     static fail = {};
-    grammar;
-    lexer;
-    lexerState;
-    table;
-    current;
-    results;
+    lexer: Lexer;
+    lexerState?: LexerState;
+    table: Column[];
+    current: number = 0;
+    results?: StateData[];
+    options: ParserOptions;
 
-    constructor(private rules, private start?, private options?) {
-        if (rules instanceof Grammar) {
-            var grammar = rules;
-            var options = start;
-        } else {
-            var grammar = Grammar.fromCompiled(rules, start);
-        }
-        this.grammar = grammar;
+    constructor(private grammar: Grammar & { start: string }, options?: Partial<ParserOptions>) {
+        this.options = Object.assign({},
+            { keepHistory: false, lexer: grammar.lexer || new StreamLexer },
+            options,
+        );
 
-        // Read options
-        this.options = {
-            keepHistory: false,
-            lexer: grammar.lexer || new StreamLexer,
-        };
-        for (var key in (options || {})) {
-            this.options[key] = options[key];
-        }
-
-        // Setup lexer
         this.lexer = this.options.lexer;
         this.lexerState = undefined;
 
-        // Setup a table
-        var column = new Column(grammar, 0);
+        const column = new Column(grammar, 0);
         this.table = [column];
 
-        // I could be expecting anything.
         column.wants[grammar.start] = [];
         column.predict(grammar.start);
-        // TODO what if start rule is nullable?
         column.process();
-        this.current = 0; // token index
     }
 
-    feed(chunk) {
-        var lexer = this.lexer;
+    static fromCompiled(rules: CompiledRules | ParserRule[], start: string, options: Partial<ParserOptions>) {
+        const grammar = Grammar.fromCompiled(rules, start);
+        return new Parser(grammar, options);
+    }
+
+    feed(chunk: string): this {
+        let lexer = this.lexer;
         lexer.reset(chunk, this.lexerState);
 
-        var token;
+        let token: TokenValue | undefined;
+        let column: Column | null = null;
         while (token = lexer.next()) {
-            // We add new states to table[current+1]
-            var column = this.table[this.current];
+            column = this.table[this.current];
 
-            // GC unused states
             if (!this.options.keepHistory) {
                 delete this.table[this.current - 1];
             }
 
-            var n = this.current + 1;
-            var nextColumn = new Column(this.grammar, n);
+            const n = this.current + 1;
+            const nextColumn = new Column(this.grammar, n);
             this.table.push(nextColumn);
 
             // Advance all tokens that expect the symbol
-            var literal = token.text !== undefined ? token.text : token.value;
-            var value = lexer.constructor === StreamLexer ? token.value : token;
-            var scannable = column.scannable;
-            for (var w = scannable.length; w--;) {
-                var state = scannable[w];
-                var expect = state.rule.symbols[state.dot];
+            const literal = "text" in token ? token.text : token.value;
+            const value = lexer.constructor === StreamLexer ? token.value : token;
+            const scannable = column.scannable;
+            for (let w = scannable.length; w--;) {
+                const state = scannable[w];
+                const expect = state.rule.symbols[state.dot];
                 // Try to consume the token
                 // either regex or literal
-                if (expect.test ? expect.test(value) :
-                    expect.type ? expect.type === token.type
-                        : expect.literal === literal) {
+                if (expect.test ? expect.test(value) : expect.type ? expect.type === token.type : expect.literal === literal) {
                     // Add it
-                    var next = state.nextState({ data: value, token: token, isToken: true, reference: n - 1 });
+                    const next = state.nextState({ data: value, token: token, isToken: true, reference: n - 1 });
                     nextColumn.states.push(next);
                 }
             }
 
-            // Next, for each of the rules, we either
-            // (a) complete it, and try to see if the reference row expected that
-            //     rule
-            // (b) predict the next nonterminal it expects by adding that
-            //     nonterminal's start state
-            // To prevent duplication, we also keep track of rules we have already
-            // added
 
             nextColumn.process();
 
-            // If needed, throw an error:
             if (nextColumn.states.length === 0) {
-                // No states at all! This is not good.
-                var err: TokenError = new Error(this.reportError(token));
+                const err: TokenError = new Error(this.reportError(token));
                 err.offset = this.current;
                 err.token = token;
                 throw err;
             }
 
-            // maybe save lexer state
-            if (this.options.keepHistory) {
+            if (this.options.keepHistory)
                 column.lexerState = lexer.save()
-            }
 
             this.current++;
         }
-        if (column) {
-            this.lexerState = lexer.save()
-        }
 
-        // Incrementally keep track of results
+        if (column)
+            this.lexerState = lexer.save()
+
         this.results = this.finish();
 
-        // Allow chaining, for whatever it's worth
         return this;
     };
 
-    reportError(token) {
-        var lines = [];
+    reportError(token: TokenValue): string {
+        var lines: string[] = [];
         const tokenDisplay = (token.type ? token.type + " token: " : "") + JSON.stringify(token.value !== undefined ? token.value : token);
         lines.push(this.lexer.formatError(token, "Syntax error"));
         lines.push('Unexpected ' + tokenDisplay + '. Instead, I was expecting to see one of the following:\n');
         const lastColumnIndex = this.table.length - 2;
         const lastColumn = this.table[lastColumnIndex];
         const expectantStates = lastColumn.states
-            .filter(function (state) {
+            .filter((state) => {
                 const nextSymbol = state.rule.symbols[state.dot];
                 return nextSymbol && typeof nextSymbol !== "string";
             });
@@ -135,24 +109,24 @@ export class Parser {
         // - which shows you how this state came to be, step by step. 
         // If there is more than one derivation, we only display the first one.
         const stateStacks = expectantStates
-            .map(function (state) {
+            .map((state) => {
                 const stacks = this.buildStateStacks(state, []);
                 return stacks[0];
             }, this);
         // Display each state that is expecting a terminal symbol next.
-        stateStacks.forEach(function (stateStack) {
+        stateStacks.forEach((stateStack) => {
             const state = stateStack[0];
             const nextSymbol = state.rule.symbols[state.dot];
             const symbolDisplay = this.getSymbolDisplay(nextSymbol);
             lines.push('A ' + symbolDisplay + ' based on:');
             this.displayStateStack(stateStack, lines);
-        }, this);
+        });
 
         lines.push("");
         return lines.join("\n");
     };
 
-    displayStateStack(stateStack, lines) {
+    displayStateStack(stateStack: State[], lines: string[]) {
         var lastDisplay;
         var sameDisplayCount = 0;
         for (let j = 0; j < stateStack.length; j++) {
@@ -186,36 +160,19 @@ export class Parser {
         }
     };
 
-    /*
-    Builds a number of "state stacks". You can think of a state stack as the call stack
-    of the recursive-descent parser which the Nearley parse algorithm simulates.
-    A state stack is represented as an array of state objects. Within a 
-    state stack, the first item of the array will be the starting
-    state, with each successive item in the array going further back into history.
-     
-    This function needs to be given a starting state and an empty array representing
-    the visited states, and it returns an array of state stacks. 
-     
-    */
-    buildStateStacks(state, visited) {
+    buildStateStacks(state: State, visited: State[]): State[][] {
         if (visited.indexOf(state) !== -1) {
-            // Found cycle, return empty array (meaning no stacks)
-            // to eliminate this path from the results, because
-            // we don't know how to display it meaningfully
             return [];
         }
         if (state.wantedBy.length === 0) {
             return [[state]];
         }
-        var that = this;
 
-        return state.wantedBy.reduce(function (stacks, prevState) {
-            return stacks.concat(that.buildStateStacks(
+        return state.wantedBy.reduce<State[][]>((stacks, prevState) => {
+            return stacks.concat(this.buildStateStacks(
                 prevState,
                 [state].concat(visited))
-                .map(function (stack) {
-                    return [state].concat(stack);
-                }));
+                .map((stack) => [state].concat(stack)));
         }, []);
     };
 
@@ -225,7 +182,7 @@ export class Parser {
         return column;
     };
 
-    restore(column) {
+    restore(column: Column) {
         var index = column.index;
         this.current = index;
         this.table[index] = column;
@@ -236,34 +193,28 @@ export class Parser {
         this.results = this.finish();
     };
 
-    // nb. deprecated: use save/restore instead!
-    rewind(index) {
-        if (!this.options.keepHistory) {
-            throw new Error('set option `keepHistory` to enable rewinding')
-        }
-        // nb. recall column (table) indicies fall between token indicies.
-        //        col 0   --   token 0   --   col 1
-        this.restore(this.table[index]);
-    };
 
-    finish() {
+    finish(): StateData[] {
         // Return the possible parsings
-        var considerations = [];
-        var start = this.grammar.start;
-        var column = this.table[this.table.length - 1]
-        column.states.forEach(function (t) {
+        const considerations: StateData[] = [];
+        const start = this.grammar.start;
+        const column = this.table[this.table.length - 1]
+        column.states.forEach((t) => {
             if (t.rule.name === start
                 && t.dot === t.rule.symbols.length
-                && t.reference === 0
-                && t.data !== Parser.fail) {
-                considerations.push(t);
+                && t.reference === 0) {
+                considerations.push(t.data);
             }
         });
-        return considerations.map(function (c) { return c.data; });
+        return considerations;
     };
 }
 
 interface TokenError extends Error {
-    offset?;
-    token?;
+    offset?: number;
+    token?: Token;
+}
+export interface ParserOptions {
+    keepHistory: boolean;
+    lexer: Lexer;
 }

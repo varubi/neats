@@ -1,29 +1,29 @@
 
 const fs = require('fs');
 
-const nearley = require('../lib/nearley');
-const {compile} = require('./_shared');
+var { Parser } = require('../dist/parser');
+const { compile } = require('./_shared');
 
 function read(filename) {
-    return fs.readFileSync(filename, 'utf-8');
+  return fs.readFileSync(filename, 'utf-8');
 }
 
 function makeParser(neFile) {
-    var grammar;
-    try {
-        grammar = compile(read(neFile));
-    } catch (e) {
-        grammar = null; // oh dear
-    }
+  var grammar;
+  try {
+    grammar = compile(read(neFile));
+  } catch (e) {
+    grammar = null; // oh dear
+  }
 
-    return function parse(input) {
-        if (grammar === null) {
-            throw 'grammar error';
-        }
-        var p = new nearley.Parser(grammar);
-        p.feed(input);
-        return p.results;
+  return function parse(input) {
+    if (grammar === null) {
+      throw 'grammar error';
     }
+    var p = new Parser(grammar);
+    p.feed(input);
+    return p.results;
+  }
 }
 
 

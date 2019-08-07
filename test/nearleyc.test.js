@@ -2,7 +2,7 @@
 const fs = require('fs');
 const expect = require('expect');
 
-const nearley = require('../lib/nearley');
+var { Grammar } = require('../dist/grammar');
 const {compile, evalGrammar, parse, nearleyc} = require('./_shared');
 const {sh, externalNearleyc, cleanup} = require('./external');
 
@@ -26,7 +26,7 @@ describe("bin/nearleyc", function() {
         const {outPath, stdout, stderr} = externalNearleyc("grammars/parens.ne", '.js');
         expect(stderr).toBe("");
         expect(stdout).toBe("");
-        const grammar = nearley.Grammar.fromCompiled(require(`./${outPath}.js`));
+        const grammar = Grammar.fromCompiled(require(`./${outPath}.js`));
     });
 
     it('builds for ES6+', function() {
@@ -55,7 +55,7 @@ describe("bin/nearleyc", function() {
         expect(stderr).toBe("");
         expect(stdout).toBe("");
         sh(`coffee -c ${outPath}.coffee`);
-        const grammar = nearley.Grammar.fromCompiled(require(`./${outPath}.js`));
+        const grammar = Grammar.fromCompiled(require(`./${outPath}.js`));
         expect(parse(grammar, "ABCDEFZ12309")).toEqual([ [ 'ABCDEFZ', '12309' ] ]);
     });
 
@@ -65,7 +65,7 @@ describe("bin/nearleyc", function() {
         expect(stderr).toBe("");
         expect(stdout).toBe("");
         sh(`tsc ${outPath}.ts`);
-        const grammar = nearley.Grammar.fromCompiled(require(`./${outPath}.js`));
+        const grammar = Grammar.fromCompiled(require(`./${outPath}.js`));
         expect(parse(grammar, "<123>")).toEqual([ [ '<', '123', '>' ] ]);
     });
 
@@ -73,14 +73,14 @@ describe("bin/nearleyc", function() {
         const {outPath, stdout, stderr} = externalNearleyc("grammars/folder-test.ne", '.js');
         expect(stderr).toBe("");
         expect(stdout).toBe("");
-        const grammar = nearley.Grammar.fromCompiled(require(`./${outPath}.js`));
+        const grammar = Grammar.fromCompiled(require(`./${outPath}.js`));
     });
 
     it('builds modules with multiple includes of the same file', function() {
         const {outPath, stdout, stderr} = externalNearleyc("grammars/multi-include-test.ne", '.js');
         expect(stderr).toBe("");
         expect(stdout).toBe("");
-        const grammar = nearley.Grammar.fromCompiled(require(`./${outPath}.js`));
+        const grammar = Grammar.fromCompiled(require(`./${outPath}.js`));
     });
 
     it("warns about undefined symbol", function () {

@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "allowSyntheticDefaultImports": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUnusedLocals": false,
+        "noImplicitAny": false,
+        "target": "es6",
+        "module": "commonjs",
+        "strict": true,
+        "sourceMap": true,
+        "outDir": "dist",
+        "allowJs": true
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}

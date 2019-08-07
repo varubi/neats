@@ -1,68 +1,136 @@
 import { Grammar } from "./grammar";
 import { Parser } from "./parser";
+import { Lexer, Dictionary, Token } from "./common/types";
+import { PreProcessors, PreProcessor } from "./Processors/preprocessors";
 import { Rule } from "./rule";
 
-export const Compile = (structure, opts) => new Compiler(structure, opts);
+export interface CompilerConfig {
+    preprocessor: string;
+    lexer: Lexer;
+}
+export interface Macro {
+    args: any;
+    exprs: any;
+};
+export interface opts {
+    alreadycompiled: string[];
+    args: string[];
+    nojs: boolean;
+}
+
+interface ProductionRuleBody {
+    body: string;
+}
+
+interface ProductionRuleInclude {
+    include: any;
+    builtin: any;
+}
+
+interface ProductionRuleMacro {
+    macro: string;
+    args: any;
+    exprs: any;
+}
+
+type ProductionRuleConfig = { config: 'lexer' & string, value: Lexer } | { config: 'preprocessor' & string, value: string };
+
+interface ProductionRuleRules {
+    name: string;
+    rules: ProductionRuleRulesRule[];
+}
+
+interface ProductionRuleRulesRule {
+    tokens: (Token | string)[];
+    postprocess?: {
+        builtin: string;
+    }
+}
+
+interface LiteralToken {
+    literal: string;
+}
+
+interface SubExpressionToken {
+    subexpression: ProductionRuleRulesRule[];
+}
+
+interface EBNFToken {
+    ebnf: string;
+    modifier: string;
+}
+
+interface MacroToken {
+    macrocall: string;
+    args: ProductionRuleRulesRule[];
+}
+
+export type ProductionRule = ProductionRuleBody | ProductionRuleInclude | ProductionRuleMacro | ProductionRuleConfig | ProductionRuleRules;
+
+
+
+export function Compile(structure: ProductionRule[], opts: opts) {
+    const c = new Compiler(structure, opts);
+    c.initialize();
+    return c;
+}
 export class Compiler {
-    private unique = uniquer();
-    public rules: any = [];
+    private _uniqueCache: Dictionary<number> = {};
+
+    public rules: Rule[] = [];
     public body: any = [];
-    public customTokens: any = [];
-    public config: any = {};
-    public macros: any = {};
-    public start: any = '';
+    public customTokens: string[] = [];
+    public config: CompilerConfig = <CompilerConfig>{};
+    public macros: Dictionary<Macro> = {};
+    public start: string = '';
     public version;// opts.version || 'unknown'
 
-    constructor(structure, private opts) {
-        if (!opts.alreadycompiled) {
-            opts.alreadycompiled = [];
-        }
+    constructor(private structure: ProductionRule[], private opts: opts) {
+        this.opts.alreadycompiled = this.opts.alreadycompiled || [];
+    }
 
-        for (var i = 0; i < structure.length; i++) {
-            const productionRule = structure[i];
-            if (productionRule.body) {
-                if (!opts.nojs) {
+    initialize() {
+        for (let i = 0; i < this.structure.length; i++) {
+            const productionRule = this.structure[i];
+            if ("body" in productionRule) {
+                if (!this.opts.nojs) {
                     this.body.push(productionRule.body);
                 }
-            } else if (productionRule.include) {
-                var path;
+            } else if ("include" in productionRule) {
+                let path;
                 if (!productionRule.builtin) {
-                    path = require('path').resolve(
-                        opts.args[0] ? require('path').dirname(opts.args[0]) : process.cwd(),
-                        productionRule.include
-                    );
+                    path = require('path').resolve(this.opts.args[0] ? require('path').dirname(this.opts.args[0]) : process.cwd(), productionRule.include);
                 } else {
-                    path = require('path').resolve(
-                        __dirname,
-                        '../builtin/',
-                        productionRule.include
-                    );
+                    path = require('path').resolve(__dirname, '../builtin/', productionRule.include);
                 }
-                if (opts.alreadycompiled.indexOf(path) === -1) {
-                    opts.alreadycompiled.push(path);
-                    var f = require('fs').readFileSync(path).toString();
-                    var parserGrammar = Grammar.fromCompiled(require('./nearley-language-bootstrapped.js'));
-                    var parser = new Parser(parserGrammar);
+                if (this.opts.alreadycompiled.indexOf(path) === -1) {
+                    this.opts.alreadycompiled.push(path);
+                    const f = require('fs').readFileSync(path).toString();
+                    const { Lexer, ParserRules, ParserStart } = require('./nearley-language-bootstrapped.js');
+                    const parserGrammar = Grammar.fromCompiled({ Lexer, ParserRules, ParserStart });
+                    const parser = new Parser(parserGrammar, { lexer: Lexer || ParserRules.lexer });
                     parser.feed(f);
-                    var c = new Compiler(parser.results[0], { args: [path], __proto__: opts });
-                    this.rules = this.rules.concat(c.rules);
-                    this.body = this.body.concat(c.body);
-                    this.customTokens = this.customTokens.concat(c.customTokens);
-                    Object.keys(c.config).forEach((k) => {
-                        this.config[k] = c.config[k];
-                    });
-                    Object.keys(c.macros).forEach((k) => {
-                        this.macros[k] = c.macros[k];
-                    });
+                    if (!parser.results)
+                        continue;
+                    const c = Compile(parser.results[0], <opts>(<any>{ __proto__: this.opts, args: [path] }));
+                    this.body = [...this.body, ...c.body];
+                    this.rules = [...this.rules, ...c.rules];
+                    this.customTokens = [...this.customTokens, ...c.customTokens];
+                    this.config = { ...this.config, ...c.config };
+                    this.macros = { ...this.macros, ...c.macros };
                 }
-            } else if (productionRule.macro) {
+            } else if ("macro" in productionRule) {
                 this.macros[productionRule.macro] = {
-                    'args': productionRule.args,
-                    'exprs': productionRule.exprs
+                    args: productionRule.args,
+                    exprs: productionRule.exprs
                 };
-            } else if (productionRule.config) {
-                // This isn't a rule, it's an @config.
-                this.config[productionRule.config] = productionRule.value
+            } else if ("config" in productionRule) {
+                if (productionRule.config === 'lexer') {
+                    this.config.lexer = productionRule.value;
+                }
+                if (productionRule.config === 'preprocessor' && typeof productionRule.value === 'string') {
+                    this.config.preprocessor = productionRule.value;
+                }
             } else {
                 this.produceRules(productionRule.name, productionRule.rules, {});
                 if (!this.start) {
@@ -72,9 +140,24 @@ export class Compiler {
         }
     }
 
-    private produceRules(name, rules, env) {
-        for (var i = 0; i < rules.length; i++) {
-            var rule = this.buildRule(name, rules[i], env);
+    generate(exportName: string, preprocessor?: PreProcessor): string {
+        if (!this.config.preprocessor) {
+            this.config.preprocessor = "_default";
+        }
+
+        preprocessor = preprocessor || PreProcessors[this.config.preprocessor];
+
+        if (!preprocessor) {
+            throw new Error("No such preprocessor: " + this.config.preprocessor)
+        }
+
+        return preprocessor.preProcess(this, exportName);
+
+    }
+
+    private produceRules(name: string, rules: ProductionRuleRulesRule[], env: Dictionary<string>) {
+        for (let i = 0; i < rules.length; i++) {
+            const rule = this.buildRule(name, rules[i], env);
             if (this.opts.nojs) {
                 rule.postprocess = null;
             }
@@ -83,9 +166,9 @@ export class Compiler {
     }
 
     private buildRule(ruleName, rule, env) {
-        var tokens = [];
-        for (var i = 0; i < rule.tokens.length; i++) {
-            var token = this.buildToken(ruleName, rule.tokens[i], env);
+        const tokens: (string | RegExp)[] = [];
+        for (let i = 0; i < rule.tokens.length; i++) {
+            const token = this.buildToken(ruleName, rule.tokens[i], env);
             if (token !== null) {
                 tokens.push(token);
             }
@@ -114,13 +197,14 @@ export class Compiler {
             }
             return this.buildStringToken(ruleName, token, env);
         }
+
         if (token.token) {
             if (this.config.lexer) {
-                var name = token.token;
+                const name = token.token;
                 if (this.customTokens.indexOf(name) === -1) {
                     this.customTokens.push(name);
                 }
-                var expr = this.config.lexer + ".has(" + JSON.stringify(name) + ") ? {type: " + JSON.stringify(name) + "} : " + name;
+                const expr = this.config.lexer + ".has(" + JSON.stringify(name) + ") ? {type: " + JSON.stringify(name) + "} : " + name;
                 return { token: "(" + expr + ")" };
             }
             return token;
@@ -149,14 +233,12 @@ export class Compiler {
         throw new Error("unrecognized token: " + JSON.stringify(token));
     }
 
-    private buildStringToken(ruleName, token, env) {
-        var newname = this.unique(ruleName + "$string");
+    private buildStringToken(ruleName: string, token: LiteralToken, env) {
+        const newname = this.unique(ruleName + "$string");
         this.produceRules(newname, [
             {
                 tokens: token.literal.split("").map((d) => {
-                    return {
-                        literal: d
-                    };
+                    return { literal: d };
                 }),
                 postprocess: { builtin: "joiner" }
             }
@@ -164,14 +246,14 @@ export class Compiler {
         return newname;
     }
 
-    private buildSubExpressionToken(ruleName, token, env) {
-        var data = token.subexpression;
-        var name = this.unique(ruleName + "$subexpression");
+    private buildSubExpressionToken(ruleName: string, token: SubExpressionToken, env) {
+        const data = token.subexpression;
+        const name = this.unique(ruleName + "$subexpression");
         this.produceRules(name, data, env);
         return name;
     }
 
-    private buildEBNFToken(ruleName, token, env) {
+    private buildEBNFToken(ruleName: string, token: EBNFToken, env) {
         switch (token.modifier) {
             case ":+":
                 return this.buildEBNFPlus(ruleName, token, env);
@@ -182,8 +264,8 @@ export class Compiler {
         }
     }
 
-    private buildEBNFPlus(ruleName, token, env) {
-        var name = this.unique(ruleName + "$ebnf");
+    private buildEBNFPlus(ruleName: string, token: EBNFToken, env) {
+        const name = this.unique(ruleName + "$ebnf");
         this.produceRules(name,
             [{
                 tokens: [token.ebnf],
@@ -196,8 +278,8 @@ export class Compiler {
         return name;
     }
 
-    private buildEBNFStar(ruleName, token, env) {
-        var name = this.unique(ruleName + "$ebnf");
+    private buildEBNFStar(ruleName: string, token: EBNFToken, env) {
+        const name = this.unique(ruleName + "$ebnf");
         this.produceRules(name,
             [{
                 tokens: [],
@@ -210,8 +292,8 @@ export class Compiler {
         return name;
     }
 
-    private buildEBNFOpt(ruleName, token, env) {
-        var name = this.unique(ruleName + "$ebnf");
+    private buildEBNFOpt(ruleName: string, token: EBNFToken, env) {
+        const name = this.unique(ruleName + "$ebnf");
         this.produceRules(name,
             [{
                 tokens: [token.ebnf],
@@ -225,33 +307,28 @@ export class Compiler {
         return name;
     }
 
-    private buildMacroCallToken(ruleName, token, env) {
-        var name = this.unique(ruleName + "$macrocall");
-        var macro = this.macros[token.macrocall];
+    private buildMacroCallToken(ruleName: string, token: MacroToken, env) {
+        const name = this.unique(ruleName + "$macrocall");
+        const macro = this.macros[token.macrocall];
         if (!macro) {
             throw new Error("Unkown macro: " + token.macrocall);
         }
         if (macro.args.length !== token.args.length) {
             throw new Error("Argument count mismatch.");
         }
-        var newenv = { __proto__: env };
-        for (var i = 0; i < macro.args.length; i++) {
-            var argrulename = this.unique(ruleName + "$macrocall");
+        const newenv = { __proto__: env };
+        for (let i = 0; i < macro.args.length; i++) {
+            const argrulename = this.unique(ruleName + "$macrocall");
             newenv[macro.args[i]] = argrulename;
             this.produceRules(argrulename, [token.args[i]], env);
         }
         this.produceRules(name, macro.exprs, newenv);
         return name;
     }
-}
 
-function uniquer() {
-    var uns = {};
-    return unique;
-    function unique(name) {
-        var un = uns[name] = (uns[name] || 0) + 1;
+    private unique(name: string) {
+        const un = this._uniqueCache[name] = (this._uniqueCache[name] || 0) + 1;
         return name + '$' + un;
+
     }
 }
-
-

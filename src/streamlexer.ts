@@ -1,21 +1,21 @@
-export class StreamLexer {
-    buffer;
-    index;
-    line;
-    lastLineBreak;
+import { Lexer, Token, LexerState, TokenValue } from "./common/types";
 
-    constructor() {
-        this.reset("");
-    }
+export class StreamLexer implements Lexer {
+    private buffer: string = "";
+    private index: number = 0;
+    private line: number = 1;
+    private lastLineBreak: number = 0;
 
-    reset(data, state?) {
+    constructor() { }
+
+    reset(data: string, state?: LexerState) {
         this.buffer = data;
         this.index = 0;
         this.line = state ? state.line : 1;
         this.lastLineBreak = state ? -state.col : 0;
     }
 
-    next() {
+    next(): TokenValue | undefined {
         if (this.index < this.buffer.length) {
             var ch = this.buffer[this.index++];
             if (ch === '\n') {
@@ -26,14 +26,14 @@ export class StreamLexer {
         }
     }
 
-    save() {
+    save(): { line: number, col: number } {
         return {
             line: this.line,
             col: this.index - this.lastLineBreak,
         }
     }
 
-    formatError(token, message) {
+    formatError(_token: Token, message: string): string {
         // nb. this gets called after consuming the offending token,
         // so the culprit is index-1
         var buffer = this.buffer;

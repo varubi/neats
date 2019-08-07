@@ -1,5 +1,5 @@
 
-import * as randexp from 'randexp';
+const randexp = require('randexp');
 import { Grammar } from './grammar';
 
 function genRandom(grammar, start) {
@@ -47,10 +47,10 @@ function genBounded(grammar, start, depth) {
     // predicate, into something that counts the number of trees of depth d).
 
     var rules = grammar.rules;
-    var min_depths_rule = [];
+    var min_depths_rule: number[] = [];
 
     function synth_nt(name, depth) {
-        var good_rules = [];
+        var good_rules: number[] = [];
         var min_min_depth = Infinity;
         for (var i = 0; i < rules.length; i++) {
             min_depths_rule = [];

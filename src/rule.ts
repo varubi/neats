@@ -1,17 +1,19 @@
+import { PostProcessor } from "./common/types";
+
 export class Rule {
     static highestId = 0;
-    private id: number;
-    constructor(private name, private symbols, public postprocess) {
+    id: number;
+
+    constructor(public name: string, private symbols: (string | RegExp)[], public postprocess?: PostProcessor | null) {
         this.id = ++Rule.highestId;
     }
 
-
-    toString(withCursorAt) {
+    toString(withCursorAt?: number): string {
         function stringifySymbolSequence(e) {
             return e.literal ? JSON.stringify(e.literal) :
                 e.type ? '%' + e.type : e.toString();
         }
-        var symbolSequence = (typeof withCursorAt === "undefined")
+        var symbolSequence: string = (typeof withCursorAt === "undefined")
             ? this.symbols.map(stringifySymbolSequence).join(' ')
             : (this.symbols.slice(0, withCursorAt).map(stringifySymbolSequence).join(' ')
                 + " ● "
