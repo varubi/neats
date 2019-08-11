@@ -1,8 +1,14 @@
 import { Column } from "./column";
 import { Grammar } from "./grammar";
 import { StreamLexer } from "./streamlexer";
-import { Lexer, LexerState, CompiledRules, ParserRule, Token, TokenValue } from "./common/types";
-import { State, StateData } from "./state";
+import { Lexer, LexerState, CompiledRules, Token, TokenValue, TokenLiteral, TokenTester, TokenError, ProductionRule } from "./common/types";
+import { State } from "./state";
+import { Rule } from "./rule";
+
+export interface ParserOptions {
+    keepHistory: boolean;
+    lexer: Lexer;
+}
 
 export class Parser {
     static fail = {};
@@ -10,14 +16,14 @@ export class Parser {
     lexerState?: LexerState;
     table: Column[];
     current: number = 0;
-    results?: StateData[];
+    results?: ProductionRule[][];
     options: ParserOptions;
 
     constructor(private grammar: Grammar & { start: string }, options?: Partial<ParserOptions>) {
-        this.options = Object.assign({},
-            { keepHistory: false, lexer: grammar.lexer || new StreamLexer },
-            options,
-        );
+        this.options = {
+            ...{ keepHistory: false, lexer: grammar.lexer || new StreamLexer },
+            ...options
+        };
 
         this.lexer = this.options.lexer;
         this.lexerState = undefined;
@@ -30,9 +36,18 @@ export class Parser {
         column.process();
     }
 
-    static fromCompiled(rules: CompiledRules | ParserRule[], start: string, options: Partial<ParserOptions>) {
+    static fromCompiled(rules: CompiledRules | Rule[], start: string, options: Partial<ParserOptions>) {
         const grammar = Grammar.fromCompiled(rules, start);
         return new Parser(grammar, options);
+    }
+
+    testToken(tester: TokenTester | TokenLiteral, token: TokenValue): boolean {
+        const literal = "text" in token ? token.text : token.value;
+        const value = this.lexer.constructor === StreamLexer ? token.value : token;
+        if ("test" in tester ? tester.test(<string>value) : tester.type ? tester.type === token.type : tester.literal === literal) {
+            return true;
+        }
+        return false;
     }
 
     feed(chunk: string): this {
@@ -53,16 +68,12 @@ export class Parser {
             this.table.push(nextColumn);
 
             // Advance all tokens that expect the symbol
-            const literal = "text" in token ? token.text : token.value;
             const value = lexer.constructor === StreamLexer ? token.value : token;
             const scannable = column.scannable;
             for (let w = scannable.length; w--;) {
                 const state = scannable[w];
                 const expect = state.rule.symbols[state.dot];
-                // Try to consume the token
-                // either regex or literal
-                if (expect.test ? expect.test(value) : expect.type ? expect.type === token.type : expect.literal === literal) {
-                    // Add it
+                if (this.testToken(expect, token)) {
                     const next = state.nextState({ data: value, token: token, isToken: true, reference: n - 1 });
                     nextColumn.states.push(next);
                 }
@@ -118,7 +129,7 @@ export class Parser {
             const state = stateStack[0];
             const nextSymbol = state.rule.symbols[state.dot];
             const symbolDisplay = this.getSymbolDisplay(nextSymbol);
-            lines.push('A ' + symbolDisplay + ' based on:');
+            lines.push(`A ${symbolDisplay} based on:`);
             this.displayStateStack(stateStack, lines);
         });
 
@@ -136,7 +147,7 @@ export class Parser {
                 sameDisplayCount++;
             } else {
                 if (sameDisplayCount > 0) {
-                    lines.push('    ⬆ ︎' + sameDisplayCount + ' more lines identical to this');
+                    lines.push(`    ⬆ ︎${sameDisplayCount} more lines identical to this`);
                 }
                 sameDisplayCount = 0;
                 lines.push('    ' + display);
@@ -194,9 +205,9 @@ export class Parser {
     };
 
 
-    finish(): StateData[] {
+    finish(): ProductionRule[][] {
         // Return the possible parsings
-        const considerations: StateData[] = [];
+        const considerations: ProductionRule[][] = [];
         const start = this.grammar.start;
         const column = this.table[this.table.length - 1]
         column.states.forEach((t) => {
@@ -208,13 +219,4 @@ export class Parser {
         });
         return considerations;
     };
-}
-
-interface TokenError extends Error {
-    offset?: number;
-    token?: Token;
-}
-export interface ParserOptions {
-    keepHistory: boolean;
-    lexer: Lexer;
 }

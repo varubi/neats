@@ -8,7 +8,7 @@ export const TypeScriptProcessor: PreProcessor = {
             + `// Bypasses TS6133. Allow declared but unused functions.\n`
             + `// @ts-ignore\n`
             + `function id(d: any[]): any { return d[0]; }\n`
-            + compiler.customTokens.map((token) => `declare var ${token}: any;\n`).join(``)
+            + Object.keys(compiler.customTokens).map((token) => `declare var ${token}: any;\n`).join(``)
             + compiler.body.join('\n')
             + `\n`
             + `export interface Token { value: any; [key: string]: any };\n`

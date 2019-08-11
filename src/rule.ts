@@ -1,10 +1,10 @@
-import { PostProcessor } from "./common/types";
+import { PostProcessor, RuleSymbol } from "./common/types";
 
 export class Rule {
     static highestId = 0;
     id: number;
 
-    constructor(public name: string, private symbols: (string | RegExp)[], public postprocess?: PostProcessor | null) {
+    constructor(public name: string, public symbols: RuleSymbol[], public postprocess?: PostProcessor | null) {
         this.id = ++Rule.highestId;
     }
 

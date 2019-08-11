@@ -1,75 +1,20 @@
 import { Grammar } from "./grammar";
 import { Parser } from "./parser";
-import { Lexer, Dictionary, Token } from "./common/types";
 import { PreProcessors, PreProcessor } from "./Processors/preprocessors";
 import { Rule } from "./rule";
+import { Lexer, Dictionary, Token, RuleSymbol, TokenLiteral, ProductionRule, Macro, ProductionRuleRulesRule, SubExpressionToken, EBNFToken, MacroToken } from "./common/types";
 
 export interface CompilerConfig {
     preprocessor: string;
     lexer: Lexer;
 }
-export interface Macro {
-    args: any;
-    exprs: any;
-};
-export interface opts {
-    alreadycompiled: string[];
+export interface CompilerArguments {
+    alreadycompiled: Dictionary<boolean>;
     args: string[];
     nojs: boolean;
 }
 
-interface ProductionRuleBody {
-    body: string;
-}
-
-interface ProductionRuleInclude {
-    include: any;
-    builtin: any;
-}
-
-interface ProductionRuleMacro {
-    macro: string;
-    args: any;
-    exprs: any;
-}
-
-type ProductionRuleConfig = { config: 'lexer' & string, value: Lexer } | { config: 'preprocessor' & string, value: string };
-
-interface ProductionRuleRules {
-    name: string;
-    rules: ProductionRuleRulesRule[];
-}
-
-interface ProductionRuleRulesRule {
-    tokens: (Token | string)[];
-    postprocess?: {
-        builtin: string;
-    }
-}
-
-interface LiteralToken {
-    literal: string;
-}
-
-interface SubExpressionToken {
-    subexpression: ProductionRuleRulesRule[];
-}
-
-interface EBNFToken {
-    ebnf: string;
-    modifier: string;
-}
-
-interface MacroToken {
-    macrocall: string;
-    args: ProductionRuleRulesRule[];
-}
-
-export type ProductionRule = ProductionRuleBody | ProductionRuleInclude | ProductionRuleMacro | ProductionRuleConfig | ProductionRuleRules;
-
-
-
-export function Compile(structure: ProductionRule[], opts: opts) {
+export function Compile(structure: ProductionRule[], opts: CompilerArguments) {
     const c = new Compiler(structure, opts);
     c.initialize();
     return c;
@@ -79,32 +24,32 @@ export class Compiler {
 
     public rules: Rule[] = [];
     public body: any = [];
-    public customTokens: string[] = [];
+    public customTokens: Dictionary<boolean> = {};
     public config: CompilerConfig = <CompilerConfig>{};
     public macros: Dictionary<Macro> = {};
     public start: string = '';
-    public version;// opts.version || 'unknown'
+    public version;
 
-    constructor(private structure: ProductionRule[], private opts: opts) {
-        this.opts.alreadycompiled = this.opts.alreadycompiled || [];
+    constructor(private structure: ProductionRule[], private args: CompilerArguments) {
+        this.args.alreadycompiled = this.args.alreadycompiled || {};
     }
 
     initialize() {
         for (let i = 0; i < this.structure.length; i++) {
             const productionRule = this.structure[i];
             if ("body" in productionRule) {
-                if (!this.opts.nojs) {
+                if (!this.args.nojs) {
                     this.body.push(productionRule.body);
                 }
             } else if ("include" in productionRule) {
                 let path;
                 if (!productionRule.builtin) {
-                    path = require('path').resolve(this.opts.args[0] ? require('path').dirname(this.opts.args[0]) : process.cwd(), productionRule.include);
+                    path = require('path').resolve(this.args.args[0] ? require('path').dirname(this.args.args[0]) : process.cwd(), productionRule.include);
                 } else {
                     path = require('path').resolve(__dirname, '../builtin/', productionRule.include);
                 }
-                if (this.opts.alreadycompiled.indexOf(path) === -1) {
-                    this.opts.alreadycompiled.push(path);
+                if (!this.args.alreadycompiled[path]) {
+                    this.args.alreadycompiled[path] = true;
                     const f = require('fs').readFileSync(path).toString();
                     const { Lexer, ParserRules, ParserStart } = require('./nearley-language-bootstrapped.js');
                     const parserGrammar = Grammar.fromCompiled({ Lexer, ParserRules, ParserStart });
@@ -112,10 +57,10 @@ export class Compiler {
                     parser.feed(f);
                     if (!parser.results)
                         continue;
-                    const c = Compile(parser.results[0], <opts>(<any>{ __proto__: this.opts, args: [path] }));
+                    const c = Compile(parser.results[0], <CompilerArguments>(<any>{ __proto__: this.args, args: [path] }));
                     this.body = [...this.body, ...c.body];
                     this.rules = [...this.rules, ...c.rules];
-                    this.customTokens = [...this.customTokens, ...c.customTokens];
+                    this.customTokens = { ...this.customTokens, ...c.customTokens };
                     this.config = { ...this.config, ...c.config };
                     this.macros = { ...this.macros, ...c.macros };
                 }
@@ -158,7 +103,7 @@ export class Compiler {
     private produceRules(name: string, rules: ProductionRuleRulesRule[], env: Dictionary<string>) {
         for (let i = 0; i < rules.length; i++) {
             const rule = this.buildRule(name, rules[i], env);
-            if (this.opts.nojs) {
+            if (this.args.nojs) {
                 rule.postprocess = null;
             }
             this.rules.push(rule);
@@ -166,7 +111,7 @@ export class Compiler {
     }
 
     private buildRule(ruleName, rule, env) {
-        const tokens: (string | RegExp)[] = [];
+        const tokens: RuleSymbol[] = [];
         for (let i = 0; i < rule.tokens.length; i++) {
             const token = this.buildToken(ruleName, rule.tokens[i], env);
             if (token !== null) {
@@ -201,8 +146,8 @@ export class Compiler {
         if (token.token) {
             if (this.config.lexer) {
                 const name = token.token;
-                if (this.customTokens.indexOf(name) === -1) {
-                    this.customTokens.push(name);
+                if (!this.customTokens[name]) {
+                    this.customTokens[name] = true;
                 }
                 const expr = this.config.lexer + ".has(" + JSON.stringify(name) + ") ? {type: " + JSON.stringify(name) + "} : " + name;
                 return { token: "(" + expr + ")" };
@@ -233,7 +178,7 @@ export class Compiler {
         throw new Error("unrecognized token: " + JSON.stringify(token));
     }
 
-    private buildStringToken(ruleName: string, token: LiteralToken, env) {
+    private buildStringToken(ruleName: string, token: TokenLiteral, env) {
         const newname = this.unique(ruleName + "$string");
         this.produceRules(newname, [
             {

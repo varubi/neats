@@ -1,12 +1,31 @@
+// const cache = {};
+// const types = {};
+// export const log = console.log;
+// console.log = function (...args) {
+//     if (new Error()!.stack!.indexOf('identify') >= 0) {
+//         log(...args);
+//     }
+// }
+// export function identify(obj) {
+//     if (!types[typeof obj]) {
+//         console.log('------');
+//         console.log(typeof obj);
+//         console.log('------');
+//         types[typeof obj] = true;
+//     }
+//     if (typeof obj === 'object') {
+//         const key = Object.keys(obj).sort().join();
+//         if (!cache[key]) {
+//             console.log('!!!!!!');
+//             console.log(key);
+//             console.log('------');
+//             console.log(obj);
+//             console.log('======');
+//             cache[key] = true;
+//         }
+//     }
+// }
 
-
-export function serializeRules(rules, builtinPostprocessors) {
-    return "[\n    "
-        + rules
-            .map((rule) => serializeRule(rule, builtinPostprocessors))
-            .join(",\n    ")
-        + "\n]";
-}
 
 export function deIndent(func) {
     var lines = func.toString().split(/\n/);
@@ -16,10 +35,9 @@ export function deIndent(func) {
     }
 
     var indent: any;
-    var tail = lines.slice(1);
-    for (var i = 0; i < tail.length; i++) {
-        var match = /^\s*/.exec(tail[i]);
-        if (match && match[0].length !== tail[i].length) {
+    for (var i = 1; i < lines.length; i++) {
+        var match = /^\s*/.exec(lines[i]);
+        if (match && match[0].length !== lines[i].length) {
             if (!indent ||
                 match[0].length < indent.length) {
                 indent = match[0];
@@ -39,30 +57,10 @@ export function deIndent(func) {
     });
 }
 
-export function tabulateString(string, indent, options?) {
-    var lines;
-    if (Array.isArray(string)) {
-        lines = string;
-    } else {
-        lines = string.toString().split('\n');
-    }
-
-    options = options || {};
-    let tabulated = lines.map(function addIndent(line, i) {
-        var shouldIndent = true;
-
-        if (i == 0 && !options.indentFirst) {
-            shouldIndent = false;
-        }
-
-        if (shouldIndent) {
-            return indent + line;
-        } else {
-            return line;
-        }
-    }).join('\n');
-
-    return tabulated;
+export function indentString(string: string | string[], indent: string, options: { indentFirst: boolean } = { indentFirst: false }) {
+    return (Array.isArray(string) ? string : string.split('\n'))
+        .map((line, i) => i > 0 || options.indentFirst ? indent + line : line)
+        .join('\n');
 }
 
 function serializeSymbol(s) {
@@ -75,6 +73,10 @@ function serializeSymbol(s) {
     }
 }
 
+export function serializeRules(rules, builtinPostprocessors) {
+    return `[\n    ${rules.map(rule => serializeRule(rule, builtinPostprocessors)).join(",\n    ")}\n]`;
+}
+
 function serializeRule(rule, builtinPostprocessors) {
     const name = JSON.stringify(rule.name);
     const symbols = rule.symbols.map(serializeSymbol).join(', ');
@@ -83,8 +85,8 @@ function serializeRule(rule, builtinPostprocessors) {
         if (rule.postprocess.builtin) {
             rule.postprocess = builtinPostprocessors[rule.postprocess.builtin];
         }
-        postprocess = ', "postprocess": ' + tabulateString(deIndent(rule.postprocess), '        ', { indentFirst: false });
+        postprocess = ',\n "postprocess": ' + indentString(deIndent(rule.postprocess), '        ', { indentFirst: false });
     }
-    return `{"name":${name},"symbols":[${symbols}]${postprocess}}`;
+    return `{"name":${name}\n,"symbols":[${symbols}]${postprocess}}`;
 
 }

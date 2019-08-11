@@ -1,5 +1,5 @@
 import { Rule } from "./rule";
-import { Dictionary, ParserRule, CompiledRules, Lexer } from "./common/types";
+import { Dictionary, CompiledRules, Lexer } from "./common/types";
 
 export class Grammar {
     byName: Dictionary<Rule[]> = {};
@@ -14,8 +14,8 @@ export class Grammar {
     }
 
     // So we can allow passing (rules, start) directly to Parser for backwards compatibility
-    static fromCompiled(rules: CompiledRules | ParserRule[], start?: string): Grammar {
-        let r: ParserRule[];
+    static fromCompiled(rules: CompiledRules | Rule[], start?: string): Grammar {
+        let r: Rule[];
         if (!Array.isArray(rules)) {
             r = rules.ParserRules;
             start = rules.ParserStart;
@@ -23,7 +23,7 @@ export class Grammar {
             r = rules;
         }
         const rs = r.map(r => new Rule(r.name, r.symbols, r.postprocess));
-        var g = new Grammar(rs, start);
+        const g = new Grammar(rs, start);
         if ('Lexer' in rules) {
             g.lexer = rules.Lexer;
         }

@@ -1,17 +1,13 @@
+import { Rule } from "../rule";
+
 export interface Dictionary<T> {
     [key: string]: T;
 }
 
 export interface CompiledRules {
     Lexer: Lexer;
-    ParserRules: ParserRule[];
+    ParserRules: Rule[];
     ParserStart: string;
-}
-
-export interface ParserRule {
-    name: string;
-    symbols: string[];
-    postprocess?: (args: any[]) => any;
 }
 
 export interface Lexer {
@@ -30,16 +26,82 @@ export interface TokenBase {
     line?: number;
     col?: number;
 }
-export interface TokenLiteral extends TokenBase {
-    literal: string;
-}
+
 export interface TokenValue extends TokenBase {
     value: string;
 }
-export type Token = TokenLiteral | TokenValue;
 
-export interface LexerState {
-    [x: string]: any;
+export interface TokenLiteral extends TokenBase {
+    literal: string;
 }
 
+export type RuleSymbol = TokenLiteral | TokenTester;
+
+export type Token = TokenLiteral | TokenValue;
+
+export interface TokenError extends Error {
+    offset?: number;
+    token?: Token;
+}
+
+export type LexerState = Dictionary<any>;
+
 export type PostProcessor = (data: any[], reference: number, wantedBy: {}) => void;
+
+export interface TokenTester {
+    test: Function;
+}
+
+
+export interface Macro {
+    args: any;
+    exprs: any;
+};
+
+
+export interface ProductionRuleBody {
+    body: string;
+}
+
+export interface ProductionRuleInclude {
+    include: any;
+    builtin: any;
+}
+
+export interface ProductionRuleMacro {
+    macro: string;
+    args: any;
+    exprs: any;
+}
+
+type ProductionRuleConfig = { config: 'lexer' & string, value: Lexer } | { config: 'preprocessor' & string, value: string };
+
+export interface ProductionRuleRules {
+    name: string;
+    rules: ProductionRuleRulesRule[];
+}
+
+export interface ProductionRuleRulesRule {
+    tokens: (Token | string)[];
+    postprocess?: {
+        builtin: string;
+    }
+}
+
+export interface SubExpressionToken {
+    subexpression: ProductionRuleRulesRule[];
+}
+
+export interface EBNFToken {
+    ebnf: string;
+    modifier: string;
+}
+
+export interface MacroToken {
+    macrocall: string;
+    args: ProductionRuleRulesRule[];
+}
+
+export type ProductionRule = ProductionRuleBody | ProductionRuleInclude | ProductionRuleMacro | ProductionRuleConfig | ProductionRuleRules;
+
+

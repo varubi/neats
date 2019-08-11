@@ -1,10 +1,10 @@
-import { tabulateString, serializeRules, deIndent } from "../common/util";
+import { indentString, serializeRules, deIndent } from "../common/util";
 import { PreProcessor } from "./preprocessors";
 
 export const CoffeeScriptProcessor: PreProcessor = {
     preProcess(compiler, exportName) {
         const rules =
-            tabulateString(
+            indentString(
                 serializeRules(compiler.rules, CoffeeScriptProcessor),
                 '      ',
                 { indentFirst: false });
@@ -12,7 +12,7 @@ export const CoffeeScriptProcessor: PreProcessor = {
             + `# http://github.com/Hardmath123/nearley\n`
             + `do ->\n`
             + `  id = (d) -> d[0]\n`
-            + `${tabulateString(deIndent(compiler.body.join('\n')), '  ')}\n`
+            + `${indentString(deIndent(compiler.body.join('\n')), '  ')}\n`
             + `  grammar = {\n`
             + `    Lexer: ${compiler.config.lexer},\n`
             + `    ParserRules: ${rules},\n`
