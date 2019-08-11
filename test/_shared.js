@@ -3,7 +3,7 @@
 var { Compile } = require('../dist/compile');
 var { Grammar } = require('../dist/grammar');
 var { Parser } = require('../dist/parser');
-var parserGrammar = Grammar.fromCompiled(require('../lib/nearley-language-bootstrapped'));
+var parserGrammar = Grammar.fromCompiled(require('../dist/nearley-language-bootstrapped'));
 
 function parse(grammar, input) {
 

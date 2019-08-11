@@ -1,7 +1,7 @@
 // This is an example of how to use a nearley-made grammar.
 var PROMPT = "> ";
-var nearley = require("../../lib/nearley.js");
 var grammar = require("./grammar.js");
+var Parser = require("../../dist/parser.js");
 
 // This is where the action is.
 function runmath(s) {
@@ -9,7 +9,7 @@ function runmath(s) {
     try {// We want to catch parse errors and die appropriately
 
         // Make a parser and feed the input
-        ans = new nearley.Parser(grammar.ParserRules, grammar.ParserStart)
+        ans = new Parser(grammar.ParserRules, grammar.ParserStart)
             .feed(s);
         
         // Check if there are any results

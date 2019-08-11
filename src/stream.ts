@@ -1,16 +1,11 @@
+import { Writable } from "stream";
 // Node-only
-
-var Writable = require('stream').Writable;
-var util = require('util');
-
-class StreamWrapper {
+export class StreamWrapper extends Writable {
     constructor(private parser) {
-        Writable.call(this);
+        super();
     }
-    _write(chunk, encoding, callback) {
+    _write(chunk, _encoding, callback) {
         this.parser.feed(chunk.toString());
         callback();
     };
 }
-util.inherits(StreamWrapper, Writable);
-export default StreamWrapper;

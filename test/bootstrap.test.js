@@ -16,7 +16,7 @@ function read(filename) {
 
 describe('bootstrapped lexer', () => {
 
-    const lexer = compile(read("lib/nearley-language-bootstrapped.ne")).lexer;
+    const lexer = compile(read("dist/nearley-language-bootstrapped.ne")).lexer;
     function lex(source) {
         return Array.from(lexer.reset(source)).map(tok => tok.type + " " + tok.value)
     }
@@ -132,7 +132,7 @@ describe('bootstrapped lexer', () => {
 describe('bootstrapped parser', () => {
 
     const scannerless = compile(read("test/grammars/scannerless-nearley.ne"));
-    const current = compile(read("lib/nearley-language-bootstrapped.ne"));
+    const current = compile(read("dist/nearley-language-bootstrapped.ne"));
 
     const check = source => expect(parse(current, source)).toEqual(parse(scannerless, source))
 

@@ -1,8 +1,8 @@
 {
-  "name": "nearley",
+  "name": "neats",
   "version": "2.17.0",
   "description": "Simple, fast, powerful parser toolkit for JavaScript.",
-  "main": "lib/nearley.js",
+  "main": "dist/index.js",
   "dependencies": {
     "commander": "^2.19.0",
     "moo": "^0.4.3",
@@ -11,15 +11,14 @@
     "semver": "^5.4.1"
   },
   "files": [
-    "bin/",
-    "lib/",
+    "dist/",
     "builtin/"
   ],
   "bin": {
-    "nearleyc": "bin/nearleyc.js",
-    "nearley-test": "bin/nearley-test.js",
-    "nearley-unparse": "bin/nearley-unparse.js",
-    "nearley-railroad": "bin/nearley-railroad.js"
+    "neatsc": "dist/cli/nearleyc.js",
+    "neats-test": "dist/cli/nearley-test.js",
+    "neats-unparse": "dist/cli/nearley-unparse.js",
+    "neats-railroad": "dist/cli/nearley-railroad.js"
   },
   "keywords": [
     "parser",
@@ -38,12 +37,11 @@
     "profile": "bin/nearleyc.js test/grammars/parens.ne > test/grammars/parens.js && node test/profile.js",
     "build": "tsc"
   },
-  "author": "Hardmath123",
-  "contributors": "https://github.com/Hardmath123/nearley/graphs/contributors",
+  "author": "varubi",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hardmath123/nearley.git"
+    "url": "https://github.com/varubi/neats.git"
   },
   "devDependencies": {
     "@types/moo": "^0.3.0",

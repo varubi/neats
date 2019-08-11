@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 
-var fs = require('fs');
-var nearley = require('../lib/nearley.js');
-var opts = require('commander');
-var randexp = require('randexp');
-var Unparse = require('../lib/unparse.js');
+import { Unparse } from "../unparse";
 
-var version = require('../package.json').version;
+const fs = require('fs');
+const opts = require('commander');
+const version = require('../package.json').version;
 opts.version(version, '-v, --version')
     .arguments('<file.js>')
     .option('-s, --start [name]', 'An optional start symbol (if not provided then use the parser start symbol)', false)
@@ -15,12 +13,12 @@ opts.version(version, '-v, --version')
     .option('-o, --out [filename]', 'File to output to (defaults to stdout)')
     .parse(process.argv);
 
-var output = opts.out ? fs.createWriteStream(opts.out) : process.stdout;
+const output = opts.out ? fs.createWriteStream(opts.out) : process.stdout;
 
-var grammar = new require(require('path').resolve(opts.args[0]));
+const grammar = require(require('path').resolve(opts.args[0]));
 
 // the main loop
-for (var i=0; i<parseInt(opts.count); i++) {
+for (let i = 0; i < parseInt(opts.count); i++) {
     output.write(Unparse(grammar, opts.start ? opts.start : grammar.ParserStart, (opts.depth === -1) ? null : parseInt(opts.depth)));
     if (parseInt(opts.count) > 1) output.write("\n");
 }

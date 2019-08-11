@@ -30,10 +30,10 @@ function makeParser(neFile) {
 // Define benchmarks
 
 /*suite('nearley: parse scannerless-nearley.ne', () => {
-  //const nearleyGrammar = read('lib/nearley-language-bootstrapped.ne')
+  //const nearleyGrammar = read('dist/nearley-language-bootstrapped.ne')
   const nearleyGrammar = read('test/grammars/scannerless-nearley.ne')
 
-  const parseLexer = makeParser('lib/nearley-language-bootstrapped.ne')
+  const parseLexer = makeParser('dist/nearley-language-bootstrapped.ne')
   benchmark('current', () => parseLexer(nearleyGrammar))
 
   const parseScannerless = makeParser('test/grammars/scannerless-nearley.ne')
@@ -43,7 +43,7 @@ function makeParser(neFile) {
 suite('nearley: parse tosh.ne', () => {
   const toshGrammar = read('examples/tosh.ne')
 
-  const parseLexer = makeParser('lib/nearley-language-bootstrapped.ne')
+  const parseLexer = makeParser('dist/nearley-language-bootstrapped.ne')
   benchmark('current', () => parseLexer(toshGrammar))
 
   const parseScannerless = makeParser('test/grammars/scannerless-nearley.ne')

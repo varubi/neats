@@ -1,6 +1,6 @@
 const expect = require("expect");
 
-const lint = require("../lib/lint");
+var { lint } = require('../dist/lint');
 
 describe("Linter", function() {
     var mockGrammar, mockOpts, writeSpy;

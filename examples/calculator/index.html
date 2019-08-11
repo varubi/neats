@@ -2,7 +2,7 @@
 <html>
     <head>
         <title>Calculator!</title>
-        <script src="../../lib/nearley.js"></script>
+        <script src="../../dist/parser.js"></script>
         <script src="grammar.js"></script>
         <style type="text/css">
             html, body {
@@ -67,7 +67,7 @@
                 
                 function evaluate() {
                     inp.style.color = "inherit";
-                    var p = new nearley.Parser(arithmetic.ParserRules, arithmetic.ParserStart)
+                    var p = new Parser(arithmetic.ParserRules, arithmetic.ParserStart)
                     try {
                         p.feed(inp.value);
                         if (!p.results[0]) {
